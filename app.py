@@ -1,4 +1,4 @@
-import streamlit as stimport streamlit as st
+import streamlit as stimport streamlit as stimport streamlit as st
 import pandas as pd
 import plotly.express as px
 from collections import defaultdict
@@ -11,6 +11,7 @@ st.set_page_config(page_title="Splitly | Smart Expense Engine", page_icon="⚡",
 # 2. Custom CSS (Dark Mode, Glassmorphism, & Avatar Styling)
 st.markdown("""
     <style>
+    /* Global Styles */
     .stApp {
         background-color: #050505;
         background-image: radial-gradient(circle at 50% 0%, #1a0b2e 0%, #050505 60%);
@@ -18,6 +19,7 @@ st.markdown("""
     h1, h2, h3 { font-family: 'Inter', sans-serif; color: #ffffff !important; letter-spacing: -0.5px; }
     p, label, .stMarkdown, .stCaption { color: #a0a0a0 !important; }
     
+    /* Inputs */
     .stTextInput input, .stNumberInput input {
         background-color: #111111 !important;
         color: white !important;
@@ -25,7 +27,7 @@ st.markdown("""
         border-radius: 8px !important;
     }
     
-    /* Card Styling */
+    /* Metric Cards */
     div[data-testid="stMetric"] {
         background: rgba(255, 255, 255, 0.03);
         backdrop-filter: blur(10px);
@@ -35,7 +37,7 @@ st.markdown("""
         box-shadow: 0 4px 20px rgba(125, 86, 244, 0.1);
     }
     
-    /* Button Styling */
+    /* Primary Buttons */
     div.stButton > button {
         background: linear-gradient(90deg, #7D56F4 0%, #4B0082 100%);
         color: white;
@@ -44,7 +46,9 @@ st.markdown("""
         padding: 10px 24px;
         font-weight: 600;
         width: 100%;
+        transition: all 0.3s ease;
     }
+    div.stButton > button:hover { transform: scale(1.02); box-shadow: 0 0 15px rgba(125, 86, 244, 0.5); }
     </style>
     """, unsafe_allow_html=True)
 
@@ -90,7 +94,7 @@ with st.sidebar:
     
     st.divider()
     st.markdown("### 👥 Squad Roster")
-    st.caption("Edit names below to generate avatars.")
+    st.caption("Edit names below to auto-generate avatars.")
     
     # EDITABLE ROSTER
     edited_members = st.data_editor(
@@ -107,14 +111,13 @@ with st.sidebar:
     st.session_state.members_df = edited_members
     current_group_list = [name for name in st.session_state.members_df["Name"].dropna().unique().tolist() if name.strip() != ""]
 
-    # NEW: AVATAR DISPLAY
+    # NEW: DYNAMIC AVATARS (DiceBear API)
     if current_group_list:
         st.markdown("#### Active Members")
-        # We use DiceBear API for free, consistent avatars
         chips_html = '<div style="display: flex; flex-wrap: wrap; gap: 10px;">'
         for name in current_group_list:
-            # Generate a seed based on name to ensure same face every time
-            avatar_url = f"https://api.dicebear.com/9.x/avataaars/svg?seed={name}&backgroundColor=b6e3f4,c0aede,d1d4f9"
+            # Generate a consistent avatar based on the name string
+            avatar_url = f"https://api.dicebear.com/9.x/notionists/svg?seed={name}&backgroundColor=b6e3f4,c0aede,d1d4f9"
             chips_html += f'''
             <div style="
                 display: flex; align-items: center; gap: 8px;
@@ -122,8 +125,9 @@ with st.sidebar:
                 border: 1px solid rgba(255, 255, 255, 0.1);
                 padding: 4px 12px 4px 4px;
                 border-radius: 30px;
+                transition: transform 0.2s;
             ">
-                <img src="{avatar_url}" width="30" height="30" style="border-radius: 50%;">
+                <img src="{avatar_url}" width="28" height="28" style="border-radius: 50%;">
                 <span style="color: #e0e0e0; font-size: 13px; font-weight: 500;">{name}</span>
             </div>
             '''
@@ -140,7 +144,7 @@ st.markdown("# ⚡ Dashboard")
 st.markdown("Real-time settlement engine active.")
 st.divider()
 
-# Expense Data
+# Expense Data Logic
 if 'data' not in st.session_state:
     p1 = current_group_list[0] if len(current_group_list) > 0 else "User"
     p2 = current_group_list[1] if len(current_group_list) > 1 else "User"
@@ -149,7 +153,6 @@ if 'data' not in st.session_state:
         {"item": "WiFi Bill", "price": 999.0, "buyer": p2},
     ])
 
-# Logic
 def calculate_balances(df, members):
     spent = defaultdict(float)
     valid_rows = df[df["buyer"].isin(members)]
@@ -171,7 +174,7 @@ def calculate_balances(df, members):
 
 balances, total_volume, spent_dict = calculate_balances(st.session_state.data, current_group_list)
 
-# Layout: Ledger vs Analytics
+# --- APP LAYOUT ---
 c_main, c_viz = st.columns([2, 1])
 
 with c_main:
@@ -185,13 +188,12 @@ with c_main:
             "buyer": st.column_config.SelectboxColumn("Paid By", options=current_group_list, required=True)
         }
     )
-    # Update data state
     st.session_state.data = edited_df
 
 with c_viz:
     st.write("### 📊 Analytics")
     
-    # NEW: INTERACTIVE DONUT CHART
+    # NEW: INTERACTIVE DONUT CHART (Plotly)
     if total_volume > 0:
         chart_data = pd.DataFrame(list(spent_dict.items()), columns=["Person", "Amount"])
         fig = px.pie(chart_data, values='Amount', names='Person', hole=0.6, 
@@ -209,9 +211,9 @@ with c_viz:
         if balances:
             summary_text = " | ".join([f"{k}: {v:+.0f}" for k,v in balances.items() if abs(v) > 1])
             st.session_state.history.append({"date": datetime.now().strftime("%d %b"), "total": total_volume, "summary": summary_text})
-            st.success("Saved!")
+            # NEW: Toast Notification
+            st.toast('Settlement saved to history!', icon='💾')
             time.sleep(1)
-            st.rerun()
 
 # Settlement & Receipt
 if balances:
@@ -240,7 +242,6 @@ if balances:
     st.divider()
     st.write("### 📱 Share Receipt")
     
-    # Generate a clean text string
     receipt_text = f"🧾 *Splitly Receipt*\n🗓 {datetime.now().strftime('%d %b %Y')}\n\n"
     for person, bal in active_balances.items():
         if bal < 0:
