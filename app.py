@@ -4,23 +4,19 @@ from collections import defaultdict
 from datetime import datetime
 import time
 
-# 1. Page Config (Dark Mode & Wide Layout)
+# 1. Page Config
 st.set_page_config(page_title="Splitly | Smart Expense Engine", page_icon="⚡", layout="wide")
 
-# 2. "Awwwards" Level Custom CSS
+# 2. Custom CSS (Dark Mode & Parallel Chips)
 st.markdown("""
     <style>
-    /* Main Background */
     .stApp {
         background-color: #050505;
         background-image: radial-gradient(circle at 50% 0%, #1a0b2e 0%, #050505 60%);
     }
-    
-    /* Typography */
     h1, h2, h3 { font-family: 'Inter', sans-serif; color: #ffffff !important; letter-spacing: -0.5px; }
     p, label, .stMarkdown, .stCaption { color: #a0a0a0 !important; }
     
-    /* Input Fields */
     .stTextInput input, .stNumberInput input {
         background-color: #111111 !important;
         color: white !important;
@@ -28,18 +24,15 @@ st.markdown("""
         border-radius: 8px !important;
     }
     
-    /* Metric Cards */
     div[data-testid="stMetric"] {
         background: rgba(255, 255, 255, 0.03);
         backdrop-filter: blur(10px);
         border: 1px solid rgba(125, 86, 244, 0.2);
         padding: 20px;
         border-radius: 12px;
-        transition: transform 0.2s;
         box-shadow: 0 4px 20px rgba(125, 86, 244, 0.1);
     }
     
-    /* Buttons */
     div.stButton > button {
         background: linear-gradient(90deg, #7D56F4 0%, #4B0082 100%);
         color: white;
@@ -47,21 +40,25 @@ st.markdown("""
         border-radius: 8px;
         padding: 10px 24px;
         font-weight: 600;
-        transition: opacity 0.3s;
     }
-    div.stButton > button:hover { opacity: 0.9; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. Session State Management
+# 3. Session State Init
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'user' not in st.session_state: st.session_state.user = None
 if 'history' not in st.session_state: st.session_state.history = []
-# NEW: Store the group members in session state
-if 'group_members' not in st.session_state: 
-    st.session_state.group_members = ["You", "Roommate 1", "Roommate 2"]
 
-# --- AUTHENTICATION SCREEN ---
+# Initialize Roster with default members
+if 'members_df' not in st.session_state: 
+    st.session_state.members_df = pd.DataFrame([
+        {"Name": "You", "Role": "Admin"},
+        {"Name": "Roommate 1", "Role": "Member"},
+        {"Name": "Roommate 2", "Role": "Member"},
+        {"Name": "Guest", "Role": "Guest"}
+    ])
+
+# --- AUTHENTICATION ---
 if not st.session_state.logged_in:
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
@@ -73,12 +70,10 @@ if not st.session_state.logged_in:
         with tab1:
             email = st.text_input("Email Address", placeholder="name@example.com")
             password = st.text_input("Password", type="password", placeholder="••••••••")
-            
             if st.button("Log In →", use_container_width=True):
                 st.session_state.logged_in = True
                 st.session_state.user = email.split('@')[0].capitalize() if email else "User"
                 st.rerun()
-                
             if st.button("Continue with Google", use_container_width=True):
                 with st.spinner("Connecting to Google..."):
                     time.sleep(1.0)
@@ -87,35 +82,53 @@ if not st.session_state.logged_in:
                     st.rerun()
     st.stop()
 
-# --- MAIN APP UI ---
-
-# Sidebar: Manage Group & History
+# --- MAIN APP ---
 with st.sidebar:
     st.markdown(f"### 👋 Hi, {st.session_state.user}")
     
-    # NEW: Manage Group Section
     st.divider()
-    st.markdown("### 👥 Manage Group")
-    new_member = st.text_input("Add New Member", placeholder="Enter name...")
-    if st.button("Add Person"):
-        if new_member and new_member not in st.session_state.group_members:
-            st.session_state.group_members.append(new_member)
-            st.success(f"Added {new_member}!")
-            time.sleep(0.5)
-            st.rerun()
+    st.markdown("### 👥 Squad Roster")
+    st.caption("Edit names below. They will appear as badges.")
     
-    # Show current members tag-style
-    st.caption("Current Members:")
-    st.code(", ".join(st.session_state.group_members))
+    # 1. EDITABLE ROSTER (Hidden Index for cleanliness)
+    edited_members = st.data_editor(
+        st.session_state.members_df,
+        num_rows="dynamic",
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Name": st.column_config.TextColumn("Name", required=True),
+            "Role": st.column_config.SelectboxColumn("Role", options=["Admin", "Member", "Guest"])
+        },
+        key="member_editor"
+    )
+    st.session_state.members_df = edited_members
+    
+    # Extract list
+    current_group_list = [name for name in st.session_state.members_df["Name"].dropna().unique().tolist() if name.strip() != ""]
+
+    # 2. PARALLEL VIEW (THE UPDATE)
+    if current_group_list:
+        st.markdown("#### Active Members")
+        # Creating HTML Chips for Parallel Display
+        chips_html = '<div style="display: flex; flex-wrap: wrap; gap: 8px;">'
+        for name in current_group_list:
+            chips_html += f'''
+            <div style="
+                background: rgba(125, 86, 244, 0.15);
+                border: 1px solid rgba(125, 86, 244, 0.5);
+                padding: 6px 14px;
+                border-radius: 20px;
+                color: #e0e0e0;
+                font-size: 12px;
+                font-weight: 500;
+                letter-spacing: 0.5px;
+            ">{name}</div>
+            '''
+        chips_html += "</div>"
+        st.markdown(chips_html, unsafe_allow_html=True)
 
     st.divider()
-    st.markdown("### 📜 History")
-    if st.session_state.history:
-        for txn in reversed(st.session_state.history[-5:]):
-            st.caption(f"{txn['date']} • ₹{txn['total']}")
-            st.markdown(f"_{txn['summary']}_")
-            st.divider()
-    
     if st.button("Log Out"):
         st.session_state.logged_in = False
         st.rerun()
@@ -125,11 +138,13 @@ st.markdown("# ⚡ Dashboard")
 st.markdown("Real-time settlement engine active.")
 st.divider()
 
-# Data Logic
+# Expense Data
 if 'data' not in st.session_state:
+    p1 = current_group_list[0] if len(current_group_list) > 0 else "User"
+    p2 = current_group_list[1] if len(current_group_list) > 1 else "User"
     st.session_state.data = pd.DataFrame([
-        {"item": "Groceries", "price": 1500.0, "buyer": st.session_state.group_members[0]},
-        {"item": "WiFi Bill", "price": 999.0, "buyer": st.session_state.group_members[1]},
+        {"item": "Groceries", "price": 1500.0, "buyer": p1},
+        {"item": "WiFi Bill", "price": 999.0, "buyer": p2},
     ])
 
 # Main Interface
@@ -137,7 +152,6 @@ c_main, c_viz = st.columns([2, 1])
 
 with c_main:
     st.write("### 📝 Active Ledger")
-    # UPDATED: The Selectbox now uses the dynamic 'group_members' list
     edited_df = st.data_editor(
         st.session_state.data, 
         num_rows="dynamic", 
@@ -146,41 +160,44 @@ with c_main:
             "price": st.column_config.NumberColumn("Amount (₹)", format="₹%d"),
             "buyer": st.column_config.SelectboxColumn(
                 "Paid By", 
-                options=st.session_state.group_members, # Dynamic list!
+                options=current_group_list, 
                 required=True
             )
         }
     )
 
-# Calculation Engine
-def calculate_balances(df):
+# Logic: Exact Split
+def calculate_balances(df, members):
     spent = defaultdict(float)
-    # Filter out rows with empty buyers
-    valid_rows = df[df["buyer"].isin(st.session_state.group_members)]
+    valid_rows = df[df["buyer"].isin(members)]
     
     for _, row in valid_rows.iterrows():
         if pd.notnull(row["price"]):
             spent[str(row["buyer"]).strip()] += float(row["price"])
     
-    # We use ALL known members for the split, even if they didn't buy anything
-    people = st.session_state.group_members
-    if not people: return {}, 0
+    if not members: return {}, 0
     
     total = sum(spent.values())
-    avg = total / len(people) # Split equally among everyone in the group
-    return {p: spent[p] - avg for p in people}, total
+    group_size = len(members) 
+    avg = total / group_size if group_size > 0 else 0
+    
+    final_balances = {}
+    for person in members:
+        person = str(person).strip()
+        final_balances[person] = spent[person] - avg
+        
+    return final_balances, total
 
-balances, total_volume = calculate_balances(edited_df)
+balances, total_volume = calculate_balances(edited_df, current_group_list)
 
-# Visualization Side Panel
+# Visualization
 with c_viz:
     st.write("### 📊 Analytics")
     st.metric("Total Volume", f"₹{total_volume:,.0f}")
-    st.metric("Group Size", len(st.session_state.group_members))
+    st.metric("Group Size", len(current_group_list))
     
     if st.button("💾 Save Settlement", use_container_width=True):
         if balances:
-            # Create a short summary string
             summary_text = " | ".join([f"{k}: {v:+.0f}" for k,v in balances.items() if abs(v) > 1])
             st.session_state.history.append({
                 "date": datetime.now().strftime("%d %b %H:%M"),
@@ -194,13 +211,11 @@ with c_viz:
 # Settlement Cards
 if balances:
     st.write("### 💸 Settlement Status")
-    
     active_balances = {k: v for k, v in balances.items() if abs(v) > 1}
     
     if not active_balances:
         st.info("Everything is settled up! ✅")
     else:
-        # Create rows of 4 columns to handle many users gracefully
         cols = st.columns(4)
         for i, (person, bal) in enumerate(active_balances.items()):
             with cols[i % 4]:
