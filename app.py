@@ -1,4 +1,4 @@
-import streamlit as stimport streamlit as st
+import streamlit as st
 import pandas as pd
 from collections import defaultdict
 from datetime import datetime
@@ -194,8 +194,7 @@ with c_viz:
 # Settlement Cards
 if balances:
     st.write("### 💸 Settlement Status")
-    cols = st.columns(len(balances))
-    # We only show cards for people who owe or are owed (skip 0 balance)
+    
     active_balances = {k: v for k, v in balances.items() if abs(v) > 1}
     
     if not active_balances:
