@@ -1,103 +1,95 @@
-import streamlit as st
+import streamlit as stimport streamlit as st
 import pandas as pd
 from collections import defaultdict
 
-# 1. Premium Page Config
-st.set_page_config(page_title="Splitly Premium", page_icon="💎", layout="wide")
+# 1. Page Config - Modern & Focused
+st.set_page_config(page_title="Smart Grocery Splitter", page_icon="🛒", layout="wide")
 
-# 2. Billionaire Aesthetics (Custom CSS)
+# 2. Elegant UI Styling (Custom CSS)
 st.markdown("""
     <style>
-    .stApp { background: linear-gradient(to right, #ffffff, #f0f2f5); }
-    div[data-testid="metric-container"] {
-        background-color: white;
-        border: 1px solid #e0e0e0;
-        padding: 15px;
-        border-radius: 15px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    .stApp { background-color: #ffffff; }
+    .main-header { font-size: 42px; font-weight: 700; color: #1E1E1E; letter-spacing: -1px; }
+    div[data-testid="stMetric"] {
+        background-color: #f9f9f9;
+        border: 1px solid #eeeeee;
+        padding: 20px;
+        border-radius: 12px;
     }
-    .main-title { font-size: 50px; font-weight: 800; color: #1E1E1E; margin-bottom: 0px; }
+    .footer-text { color: #666666; font-size: 14px; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. Sidebar - The "Vision"
+# 3. Sidebar - Founder & Context
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2489/2489756.png", width=100)
-    st.markdown("# Splitly v2.0")
-    st.info("Built by Samarth Magi")
-    st.success("Target: YC Summer 2026")
+    st.markdown("## 🛒 Project Info")
+    st.info("**Founder:** Sam  \n**Status:** MVP v1.0")
     st.divider()
-    st.write("### 💎 Premium Features")
-    st.write("✔️ Real-time Delta Tracking")
-    st.write("✔️ Multi-Party Clearinghouse")
-    st.write("✔️ Zero-Friction UI")
+    st.markdown("### How it Works")
+    st.write("1. Input expenses in the ledger.")
+    st.write("2. Add/Remove rows as needed.")
+    st.write("3. Review real-time settlement.")
 
-# 4. Main UI Header
-st.markdown('<p class="main-title">Splitly Premium</p>', unsafe_allow_html=True)
-st.markdown("#### The Intelligent Way to Settle Household Debt.")
+# 4. App Header
+st.markdown('<p class="main-header">Smart Grocery Splitter</p>', unsafe_allow_html=True)
+st.markdown("A minimalist engine for household expense settlement.")
+st.divider()
 
-# 5. The Input Engine (User-First Design)
+# 5. The Ledger (Clean & Simple)
 if 'data' not in st.session_state:
     st.session_state.data = pd.DataFrame([
-        {"item": "Shared Pizza", "price": 1200.0, "buyer": "Alice"},
-        {"item": "Electricity Bill", "price": 3500.0, "buyer": "Bob"},
-        {"item": "Internet", "price": 999.0, "buyer": "Sam"}
+        {"item": "Milk", "price": 50.0, "buyer": "Alice"},
+        {"item": "Bread", "price": 30.0, "buyer": "Bob"},
+        {"item": "Eggs", "price": 60.0, "buyer": "Alice"}
     ])
 
-st.write("### 📝 Active Ledger")
+st.write("### 📝 Expense Ledger")
 edited_df = st.data_editor(
     st.session_state.data, 
     num_rows="dynamic", 
     use_container_width=True,
     column_config={
-        "price": st.column_config.NumberColumn("Amount (₹)", format="₹%d", min_value=0),
-        "buyer": st.column_config.SelectboxColumn("Paid By", options=["Alice", "Bob", "Sam", "Guest"], required=True)
+        "price": st.column_config.NumberColumn("Price (₹)", format="₹%d"),
+        "buyer": st.column_config.TextColumn("Buyer Name")
     }
 )
 
-# 6. The "Billionaire" Logic Engine
-def solve_debts(df):
+# 6. Calculation Logic
+def calculate_balances(df):
     spent = defaultdict(float)
     for _, row in df.iterrows():
         if pd.notnull(row["price"]) and pd.notnull(row["buyer"]):
             spent[str(row["buyer"]).strip()] += float(row["price"])
-    
+
     people = list(spent.keys())
-    if not people: return {}, 0
+    if not people: return {}
     
     total = sum(spent.values())
     avg = total / len(people)
-    balances = {p: spent[p] - avg for p in people}
-    return balances, total
+    return {p: spent[p] - avg for p in people}
 
-balances, total_volume = solve_debts(edited_df)
+balances = calculate_balances(edited_df)
 
-# 7. Analytics Dashboard
-st.divider()
-st.write("### 📊 Wealth Distribution & Settlement")
-
-# High-level metrics
-m1, m2, m3 = st.columns(3)
-m1.metric("Total Volume", f"₹{total_volume:,.2f}")
-m2.metric("Active Users", len(balances))
-m3.metric("Avg. Per Person", f"₹{total_volume/len(balances):,.2f}" if balances else "₹0")
-
-# 8. Visualizing the "Split"
+# 7. Settlement Visualization
 if balances:
-    st.write("#### Final Balance Sheets")
-    # Using columns for the metrics
+    st.write("### 💰 Final Balances")
     cols = st.columns(len(balances))
+    
     for i, (person, bal) in enumerate(balances.items()):
         with cols[i]:
-            color = "normal" if bal >= 0 else "inverse"
-            st.metric(label=person, value=f"₹{bal:,.2f}", delta="Owed to them" if bal >= 0 else "Owes Group", delta_color=color)
+            if bal >= 0:
+                st.metric(label=f"Owed to {person}", value=f"₹{bal:.2f}")
+            else:
+                st.metric(label=f"{person} owes", value=f"₹{abs(bal):.2f}", delta_color="inverse")
 
-# 9. Smart Footer (Professional Links)
+# 8. Elegant Footer (Your Professional Links)
 st.divider()
-f1, f2, f3 = st.columns([2, 1, 1])
-with f1:
-    st.write("🚀 **Samarth Magi** | Product Lead @ SVMP Systems")
-with f2:
-    st.markdown("[![GitHub](https://img.shields.io/badge/GitHub-black?logo=github)](https://github.com/samarthmagi)")
-with f3:
-    st.markdown("[![LinkedIn](https://img.shields.io/badge/LinkedIn-blue?logo=linkedin)](https://linkedin.com/in/samarthmagi)")
+st.markdown('<p class="footer-text">Built by Sam for the YC Fellowship Application</p>', unsafe_allow_html=True)
+
+c1, c2, c3 = st.columns(3)
+with c1:
+    st.markdown("[![GitHub](https://img.shields.io/badge/GitHub-Profile-black?style=flat-square&logo=github)](https://github.com/samarthmagi)")
+with c2:
+    st.markdown("[![LinkedIn](https://img.shields.io/badge/LinkedIn-Profile-blue?style=flat-square&logo=linkedin)](https://linkedin.com/in/samarthmagi)")
+with c3:
+    st.markdown("[![Gmail](https://img.shields.io/badge/Gmail-Contact-red?style=flat-square&logo=gmail)](mailto:samarthmagi@gmail.com)")
