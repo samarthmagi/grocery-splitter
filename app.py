@@ -11,7 +11,7 @@ st.markdown("""
     .main { background-color: #f8f9fa; }
     .stTable { background-color: white; border-radius: 10px; }
     </style>
-    """, unsafe_base_case=True)
+    """, unsafe_allow_html=True)
 
 # 2. Sidebar for Project Context (Great for YC Reviewers)
 with st.sidebar:
@@ -92,3 +92,4 @@ with col_li:
 with col_em:
     # Replace with your actual Gmail
     st.markdown("[![Gmail](https://img.shields.io/badge/Gmail-Contact-red?style=for-the-badge&logo=gmail)](mailto:yourname@gmail.com)")
+
