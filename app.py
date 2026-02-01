@@ -6,18 +6,22 @@ from datetime import datetime
 import time
 
 # 1. Page Config
-st.set_page_config(page_title="Splitly | Smart Expense Engine", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="Splitly", page_icon="⚡", layout="wide")
 
-# 2. Custom CSS
+# 2. Custom CSS (Fixed Sidebar Glitch & Smoother UI)
 st.markdown("""
     <style>
+    /* Main Background */
     .stApp {
         background-color: #050505;
         background-image: radial-gradient(circle at 50% 0%, #1a0b2e 0%, #050505 60%);
     }
+    
+    /* Text Styling */
     h1, h2, h3 { font-family: 'Inter', sans-serif; color: #ffffff !important; letter-spacing: -0.5px; }
     p, label, .stMarkdown, .stCaption { color: #a0a0a0 !important; }
     
+    /* Smooth Inputs */
     .stTextInput input, .stNumberInput input {
         background-color: #111111 !important;
         color: white !important;
@@ -25,6 +29,7 @@ st.markdown("""
         border-radius: 8px !important;
     }
     
+    /* Metrics */
     div[data-testid="stMetric"] {
         background: rgba(255, 255, 255, 0.03);
         backdrop-filter: blur(10px);
@@ -34,22 +39,28 @@ st.markdown("""
         box-shadow: 0 4px 20px rgba(125, 86, 244, 0.1);
     }
     
+    /* Calculate Button (Primary) */
     div.stButton > button {
         background: linear-gradient(90deg, #7D56F4 0%, #4B0082 100%);
         color: white;
         border: none;
         border-radius: 8px;
-        padding: 10px 24px;
+        padding: 12px 24px;
         font-weight: 600;
         width: 100%;
+        transition: transform 0.1s ease;
     }
+    div.stButton > button:active { transform: scale(0.98); }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. Session State Init
+# 3. Session State
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'user' not in st.session_state: st.session_state.user = None
 if 'history' not in st.session_state: st.session_state.history = []
+if 'show_results' not in st.session_state: st.session_state.show_results = False
+
+# Initialize Roster
 if 'members_df' not in st.session_state: 
     st.session_state.members_df = pd.DataFrame([
         {"Name": "You", "Role": "Admin"},
@@ -75,7 +86,7 @@ if not st.session_state.logged_in:
                 st.session_state.user = email.split('@')[0].capitalize() if email else "User"
                 st.rerun()
             if st.button("Continue with Google"):
-                with st.spinner("Connecting to Google..."):
+                with st.spinner("Connecting..."):
                     time.sleep(1.0)
                     st.session_state.logged_in = True
                     st.session_state.user = "Samarth"
@@ -85,12 +96,11 @@ if not st.session_state.logged_in:
 # --- MAIN APP ---
 with st.sidebar:
     st.markdown(f"### 👋 Hi, {st.session_state.user}")
-    
     st.divider()
     st.markdown("### 👥 Squad Roster")
-    st.caption("Edit names below to auto-generate avatars.")
+    st.caption("Edit names below.")
     
-    # EDITABLE ROSTER
+    # Editable Roster
     edited_members = st.data_editor(
         st.session_state.members_df,
         num_rows="dynamic",
@@ -105,13 +115,12 @@ with st.sidebar:
     st.session_state.members_df = edited_members
     current_group_list = [name for name in st.session_state.members_df["Name"].dropna().unique().tolist() if name.strip() != ""]
 
-    # FIXED AVATARS (Minified HTML to prevent code-block error)
+    # Fixed Sidebar Avatars (Minified HTML)
     if current_group_list:
         st.markdown("#### Active Members")
         chips_html = '<div style="display: flex; flex-wrap: wrap; gap: 10px;">'
         for name in current_group_list:
             avatar_url = f"https://api.dicebear.com/9.x/notionists/svg?seed={name}&backgroundColor=b6e3f4,c0aede,d1d4f9"
-            # We compress this line so Streamlit renders it as HTML, not Code
             chips_html += f'<div style="display: flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); padding: 4px 12px 4px 4px; border-radius: 30px;"><img src="{avatar_url}" width="28" height="28" style="border-radius: 50%;"><span style="color: #e0e0e0; font-size: 13px; font-weight: 500;">{name}</span></div>'
         chips_html += "</div>"
         st.markdown(chips_html, unsafe_allow_html=True)
@@ -126,7 +135,7 @@ st.markdown("# ⚡ Dashboard")
 st.markdown("Real-time settlement engine active.")
 st.divider()
 
-# Expense Data
+# --- DATA LOGIC ---
 if 'data' not in st.session_state:
     p1 = current_group_list[0] if len(current_group_list) > 0 else "User"
     p2 = current_group_list[1] if len(current_group_list) > 1 else "User"
@@ -135,108 +144,112 @@ if 'data' not in st.session_state:
         {"item": "WiFi Bill", "price": 999.0, "buyer": p2},
     ])
 
-def calculate_balances(df, members):
-    spent = defaultdict(float)
-    valid_rows = df[df["buyer"].isin(members)]
-    for _, row in valid_rows.iterrows():
-        if pd.notnull(row["price"]):
-            spent[str(row["buyer"]).strip()] += float(row["price"])
-    if not members: return {}, 0, {}
+# Auto-Increment S.No Logic
+# We force the S.No column to match the row index + 1 every time
+df_display = st.session_state.data.copy()
+df_display.insert(0, "S.No", range(1, len(df_display) + 1))
+
+# Ledger UI
+st.write("### 📝 Active Ledger")
+edited_display = st.data_editor(
+    df_display, 
+    num_rows="dynamic", 
+    use_container_width=True,
+    hide_index=True, # This removes the checkbox column you hated!
+    column_config={
+        "S.No": st.column_config.NumberColumn("S.No", disabled=True, width="small"),
+        "price": st.column_config.NumberColumn("Amount (₹)", format="₹%d"),
+        "buyer": st.column_config.SelectboxColumn("Paid By", options=current_group_list, required=True),
+        "item": st.column_config.TextColumn("Item Name", width="large")
+    }
+)
+
+# Sync changes back to session state (Ignoring S.No)
+if not edited_display.equals(df_display):
+    # Drop S.No before saving back to state
+    st.session_state.data = edited_display.drop(columns=["S.No"])
+    # If user changes data, hide results until they click calculate again
+    st.session_state.show_results = False
+    st.rerun()
+
+st.divider()
+
+# --- THE TRIGGER BUTTON ---
+col_btn, col_blank = st.columns([1, 4])
+with col_btn:
+    if st.button("🚀 Calculate Split", type="primary", use_container_width=True):
+        st.session_state.show_results = True
+
+# --- RESULTS SECTION (Only shows after button click) ---
+if st.session_state.show_results:
     
-    total = sum(spent.values())
-    group_size = len(members) 
-    avg = total / group_size if group_size > 0 else 0
-    
-    final_balances = {}
-    for person in members:
-        person = str(person).strip()
-        final_balances[person] = spent[person] - avg
+    # Logic
+    def calculate(df, members):
+        spent = defaultdict(float)
+        valid_rows = df[df["buyer"].isin(members)]
+        for _, row in valid_rows.iterrows():
+            if pd.notnull(row["price"]):
+                spent[str(row["buyer"]).strip()] += float(row["price"])
+        if not members: return {}, 0, {}
         
-    return final_balances, total, spent
+        total = sum(spent.values())
+        group_size = len(members) 
+        avg = total / group_size if group_size > 0 else 0
+        
+        final_balances = {}
+        for person in members:
+            person = str(person).strip()
+            final_balances[person] = spent[person] - avg
+        return final_balances, total, spent
 
-balances, total_volume, spent_dict = calculate_balances(st.session_state.data, current_group_list)
-
-# Layout: Ledger vs Analytics
-c_main, c_viz = st.columns([2, 1])
-
-with c_main:
-    st.write("### 📝 Active Ledger")
-    edited_df = st.data_editor(
-        st.session_state.data, 
-        num_rows="dynamic", 
-        use_container_width=True,
-        column_config={
-            "price": st.column_config.NumberColumn("Amount (₹)", format="₹%d"),
-            "buyer": st.column_config.SelectboxColumn("Paid By", options=current_group_list, required=True)
-        }
-    )
-    st.session_state.data = edited_df
-
-with c_viz:
-    st.write("### 📊 Analytics")
+    balances, total_volume, spent_dict = calculate(st.session_state.data, current_group_list)
     
-    # INTERACTIVE DONUT CHART
-    if total_volume > 0:
-        chart_data = pd.DataFrame(list(spent_dict.items()), columns=["Person", "Amount"])
-        fig = px.pie(chart_data, values='Amount', names='Person', hole=0.6, 
-                     color_discrete_sequence=px.colors.sequential.RdBu)
-        fig.update_layout(showlegend=False, margin=dict(t=0, b=0, l=0, r=0), 
-                          paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                          font=dict(color='white'))
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Add expenses to see the breakdown.")
-
-    st.metric("Total Volume", f"₹{total_volume:,.0f}")
+    # Layout
+    c_viz, c_receipt = st.columns([1, 1])
     
-    if st.button("💾 Save to History"):
-        if balances:
-            summary_text = " | ".join([f"{k}: {v:+.0f}" for k,v in balances.items() if abs(v) > 1])
-            st.session_state.history.append({"date": datetime.now().strftime("%d %b"), "total": total_volume, "summary": summary_text})
-            st.success("Saved!")
-            time.sleep(1)
-            st.rerun()
+    with c_viz:
+        st.write("### 📊 Analytics")
+        if total_volume > 0:
+            chart_data = pd.DataFrame(list(spent_dict.items()), columns=["Person", "Amount"])
+            fig = px.pie(chart_data, values='Amount', names='Person', hole=0.6, 
+                         color_discrete_sequence=px.colors.sequential.RdBu)
+            fig.update_layout(showlegend=False, margin=dict(t=0, b=0, l=0, r=0), 
+                              paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                              font=dict(color='white'))
+            st.plotly_chart(fig, use_container_width=True)
+            st.metric("Total Volume", f"₹{total_volume:,.0f}")
+        else:
+            st.info("No expenses added yet.")
 
-# Settlement & Receipt
-if balances:
-    st.write("### 💸 Settlement Status")
-    active_balances = {k: v for k, v in balances.items() if abs(v) > 1}
-    
-    if not active_balances:
-        st.info("Everything is settled up! ✅")
-    else:
-        cols = st.columns(4)
-        for i, (person, bal) in enumerate(active_balances.items()):
-            with cols[i % 4]:
+    with c_receipt:
+        st.write("### 💸 Settlement")
+        active_balances = {k: v for k, v in balances.items() if abs(v) > 1}
+        
+        if not active_balances:
+            st.success("All settled up! ✅")
+        else:
+            for person, bal in active_balances.items():
                 color = "#7D56F4" if bal >= 0 else "#FF4B4B"
-                label = "Receive" if bal >= 0 else "Pay"
+                label = "GETS" if bal >= 0 else "OWES"
                 st.markdown(f"""
-                <div style="background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
-                    border: 1px solid {color}40; border-radius: 12px; padding: 15px; text-align: center;">
-                    <div style="color: #888; font-size: 12px; text-transform: uppercase;">{person}</div>
-                    <div style="color: white; font-size: 20px; font-weight: bold;">₹{abs(bal):,.0f}</div>
-                    <div style="color: {color}; font-size: 14px; font-weight: 600;">{label}</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; 
+                    background: rgba(255,255,255,0.05); padding: 10px 15px; border-radius: 8px; margin-bottom: 8px; border-left: 4px solid {color};">
+                    <span style="font-weight: 500; color: #eee;">{person}</span>
+                    <span style="font-weight: bold; color: {color};">{label} ₹{abs(bal):,.0f}</span>
                 </div>
                 """, unsafe_allow_html=True)
+            
+            # WhatsApp Receipt
+            st.write("#### 📱 Share")
+            receipt_text = f"🧾 *Splitly*\n"
+            for p, b in active_balances.items():
+                receipt_text += f"{'🟢' if b>0 else '🔴'} {p}: {'+' if b>0 else '-'}₹{abs(b):.0f}\n"
+            receipt_text += f"\n🔗 Total: ₹{total_volume:,.0f}"
+            st.code(receipt_text, language="text")
 
-    # WHATSAPP RECEIPT
-    st.divider()
-    st.write("### 📱 Share Receipt")
-    
-    receipt_text = f"🧾 *Splitly Receipt*\n🗓 {datetime.now().strftime('%d %b %Y')}\n\n"
-    for person, bal in active_balances.items():
-        if bal < 0:
-            receipt_text += f"🔴 {person} owes ₹{abs(bal):.0f}\n"
-        else:
-            receipt_text += f"🟢 {person} gets ₹{abs(bal):.0f}\n"
-    receipt_text += f"\n💰 Total Spend: ₹{total_volume:,.0f}\n🔗 Settled via Splitly"
-    
-    st.code(receipt_text, language="text")
-    st.caption("Copy the text above and paste it into your group chat.")
+else:
+    st.info("👆 Add expenses above and click 'Calculate Split' to see the breakdown.")
 
 # Footer
 st.markdown("<br><br>", unsafe_allow_html=True)
-f1, f2, f3 = st.columns([2,1,1])
-with f1: st.caption("© 2026 Splitly Inc.")
-with f2: st.markdown("[![GitHub](https://img.shields.io/badge/Code-black?logo=github)](https://github.com/samarthmagi)")
-with f3: st.markdown("[![Connect](https://img.shields.io/badge/Connect-blue?logo=linkedin)](https://linkedin.com/in/samarthmagi)")
+st.caption("© 2026 Splitly Inc. • YC Summer 2026")
