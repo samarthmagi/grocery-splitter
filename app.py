@@ -11,45 +11,12 @@ st.set_page_config(page_title="Splitly", page_icon="⚡", layout="wide")
 # 2. Custom CSS
 st.markdown("""
     <style>
-    /* Main Background */
-    .stApp {
-        background-color: #050505;
-        background-image: radial-gradient(circle at 50% 0%, #1a0b2e 0%, #050505 60%);
-    }
-    
-    /* Typography */
+    .stApp { background-color: #050505; background-image: radial-gradient(circle at 50% 0%, #1a0b2e 0%, #050505 60%); }
     h1, h2, h3 { font-family: 'Inter', sans-serif; color: #ffffff !important; letter-spacing: -0.5px; }
     p, label, .stMarkdown, .stCaption { color: #a0a0a0 !important; }
-    
-    /* Inputs */
-    .stTextInput input, .stNumberInput input {
-        background-color: #111111 !important;
-        color: white !important;
-        border: 1px solid #333 !important;
-        border-radius: 8px !important;
-    }
-    
-    /* Cards */
-    div[data-testid="stMetric"] {
-        background: rgba(255, 255, 255, 0.03);
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(125, 86, 244, 0.2);
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 20px rgba(125, 86, 244, 0.1);
-    }
-    
-    /* Calculate Button */
-    div.stButton > button {
-        background: linear-gradient(90deg, #7D56F4 0%, #4B0082 100%);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 12px 24px;
-        font-weight: 600;
-        width: 100%;
-        transition: transform 0.1s ease;
-    }
+    .stTextInput input, .stNumberInput input { background-color: #111111 !important; color: white !important; border: 1px solid #333 !important; border-radius: 8px !important; }
+    div[data-testid="stMetric"] { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(125, 86, 244, 0.2); padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(125, 86, 244, 0.1); }
+    div.stButton > button { background: linear-gradient(90deg, #7D56F4 0%, #4B0082 100%); color: white; border: none; border-radius: 8px; padding: 12px 24px; font-weight: 600; width: 100%; transition: transform 0.1s ease; }
     div.stButton > button:active { transform: scale(0.98); }
     </style>
     """, unsafe_allow_html=True)
@@ -74,7 +41,6 @@ with st.sidebar:
     st.markdown("### 👥 Squad Roster")
     st.caption("Add or remove people below.")
     
-    # Editable Roster
     edited_members = st.data_editor(
         st.session_state.members_df,
         num_rows="dynamic",
@@ -89,7 +55,6 @@ with st.sidebar:
     st.session_state.members_df = edited_members
     current_group_list = [name for name in st.session_state.members_df["Name"].dropna().unique().tolist() if name.strip() != ""]
 
-    # Avatars
     if current_group_list:
         st.markdown("#### Active Members")
         chips_html = '<div style="display: flex; flex-wrap: wrap; gap: 10px;">'
@@ -104,7 +69,6 @@ st.markdown("# ⚡ Dashboard")
 st.markdown("Real-time settlement engine active.")
 st.divider()
 
-# Data Initialization
 if 'data' not in st.session_state:
     p1 = current_group_list[0] if len(current_group_list) > 0 else "User"
     p2 = current_group_list[1] if len(current_group_list) > 1 else "User"
@@ -113,15 +77,12 @@ if 'data' not in st.session_state:
         {"item": "WiFi Bill", "price": 999.0, "buyer": p2},
     ])
 
-# Ledger UI
 st.write("### 📝 Active Ledger")
-st.caption("Hover over a row to see the **Trash Icon** (Delete) on the right.")
-
 edited_display = st.data_editor(
     st.session_state.data, 
     num_rows="dynamic", 
     use_container_width=True,
-    hide_index=True, # No more checkboxes/numbers!
+    hide_index=True, 
     column_config={
         "price": st.column_config.NumberColumn("Amount (₹)", format="₹%d"),
         "buyer": st.column_config.SelectboxColumn("Paid By", options=current_group_list, required=True),
@@ -129,7 +90,6 @@ edited_display = st.data_editor(
     }
 )
 
-# Sync changes
 if not edited_display.equals(st.session_state.data):
     st.session_state.data = edited_display
     st.session_state.show_results = False
@@ -137,17 +97,16 @@ if not edited_display.equals(st.session_state.data):
 
 st.divider()
 
-# Trigger Button
 col_btn, col_blank = st.columns([1, 4])
 with col_btn:
     if st.button("🚀 Calculate Split", type="primary", use_container_width=True):
         st.session_state.show_results = True
 
-# Results Section
+# --- LOGIC & RESULTS ---
 if st.session_state.show_results:
     
-    # Logic
-    def calculate(df, members):
+    # 1. Net Balances
+    def calculate_net_balances(df, members):
         spent = defaultdict(float)
         valid_rows = df[df["buyer"].isin(members)]
         for _, row in valid_rows.iterrows():
@@ -156,8 +115,7 @@ if st.session_state.show_results:
         if not members: return {}, 0, {}
         
         total = sum(spent.values())
-        group_size = len(members) 
-        avg = total / group_size if group_size > 0 else 0
+        avg = total / len(members) if members else 0
         
         final_balances = {}
         for person in members:
@@ -165,9 +123,32 @@ if st.session_state.show_results:
             final_balances[person] = spent[person] - avg
         return final_balances, total, spent
 
-    balances, total_volume, spent_dict = calculate(st.session_state.data, current_group_list)
+    # 2. Who Pays Whom (Greedy)
+    def solve_payments(balances):
+        debtors = []
+        creditors = []
+        for person, amount in balances.items():
+            if amount < -0.01: debtors.append([person, amount])
+            elif amount > 0.01: creditors.append([person, amount])
+        
+        debtors.sort(key=lambda x: x[1])
+        creditors.sort(key=lambda x: x[1], reverse=True)
+        
+        transfers = []
+        i = 0; j = 0
+        while i < len(debtors) and j < len(creditors):
+            debtor = debtors[i]; creditor = creditors[j]
+            amount = min(abs(debtor[1]), creditor[1])
+            transfers.append(f"**{debtor[0]}** pays **{creditor[0]}** ₹{amount:.0f}")
+            debtor[1] += amount; creditor[1] -= amount
+            if abs(debtor[1]) < 0.01: i += 1
+            if creditor[1] < 0.01: j += 1
+        return transfers
+
+    balances, total_volume, spent_dict = calculate_net_balances(st.session_state.data, current_group_list)
+    transfer_instructions = solve_payments(balances)
     
-    # Layout
+    # --- VISUALIZATION ---
     c_viz, c_receipt = st.columns([1, 1])
     
     with c_viz:
@@ -186,8 +167,8 @@ if st.session_state.show_results:
 
     with c_receipt:
         st.write("### 💸 Settlement")
-        active_balances = {k: v for k, v in balances.items() if abs(v) > 1}
         
+        active_balances = {k: v for k, v in balances.items() if abs(v) > 1}
         if not active_balances:
             st.success("All settled up! ✅")
         else:
@@ -201,12 +182,18 @@ if st.session_state.show_results:
                     <span style="font-weight: bold; color: {color};">{label} ₹{abs(bal):,.0f}</span>
                 </div>
                 """, unsafe_allow_html=True)
-            
-            # WhatsApp Receipt
-            st.write("#### 📱 Share")
-            receipt_text = f"🧾 *Splitly*\n"
-            for p, b in active_balances.items():
-                receipt_text += f"{'🟢' if b>0 else '🔴'} {p}: {'+' if b>0 else '-'}₹{abs(b):.0f}\n"
+        
+        if transfer_instructions:
+            st.divider()
+            st.markdown("#### 🔄 Transfer Plan")
+            st.info("  \n".join([f"👉 {t}" for t in transfer_instructions]))
+
+            st.divider()
+            st.write("#### 📱 WhatsApp")
+            receipt_text = f"🧾 *Splitly Plan*\n"
+            for t in transfer_instructions:
+                clean_t = t.replace("**", "")
+                receipt_text += f"➡️ {clean_t}\n"
             receipt_text += f"\n🔗 Total: ₹{total_volume:,.0f}"
             st.code(receipt_text, language="text")
 
@@ -215,4 +202,7 @@ else:
 
 # Footer
 st.markdown("<br><br>", unsafe_allow_html=True)
-st.caption("© 2026 Splitly Inc.")
+f1, f2, f3 = st.columns([2,1,1])
+with f1: st.caption("© 2026 Splitly Inc.")
+with f2: st.markdown("[![GitHub](https://img.shields.io/badge/Code-black?logo=github)](https://github.com/samarthmagi)")
+with f3: st.markdown("[![Connect](https://img.shields.io/badge/Connect-blue?logo=linkedin)](https://linkedin.com/in/samarthmagi)")
