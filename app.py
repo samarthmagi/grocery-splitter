@@ -11,13 +11,53 @@ st.set_page_config(page_title="Splitly", page_icon="⚡", layout="wide")
 # 2. Custom CSS
 st.markdown("""
     <style>
-    .stApp { background-color: #050505; background-image: radial-gradient(circle at 50% 0%, #1a0b2e 0%, #050505 60%); }
+    /* Main Background */
+    .stApp {
+        background-color: #050505;
+        background-image: radial-gradient(circle at 50% 0%, #1a0b2e 0%, #050505 60%);
+    }
+    
+    /* Typography */
     h1, h2, h3 { font-family: 'Inter', sans-serif; color: #ffffff !important; letter-spacing: -0.5px; }
     p, label, .stMarkdown, .stCaption { color: #a0a0a0 !important; }
-    .stTextInput input, .stNumberInput input { background-color: #111111 !important; color: white !important; border: 1px solid #333 !important; border-radius: 8px !important; }
-    div[data-testid="stMetric"] { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(125, 86, 244, 0.2); padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(125, 86, 244, 0.1); }
-    div.stButton > button { background: linear-gradient(90deg, #7D56F4 0%, #4B0082 100%); color: white; border: none; border-radius: 8px; padding: 12px 24px; font-weight: 600; width: 100%; transition: transform 0.1s ease; }
+    
+    /* Inputs */
+    .stTextInput input, .stNumberInput input, .stDateInput input {
+        background-color: #111111 !important;
+        color: white !important;
+        border: 1px solid #333 !important;
+        border-radius: 8px !important;
+    }
+    
+    /* Cards */
+    div[data-testid="stMetric"] {
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(125, 86, 244, 0.2);
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(125, 86, 244, 0.1);
+    }
+    
+    /* Buttons */
+    div.stButton > button {
+        background: linear-gradient(90deg, #7D56F4 0%, #4B0082 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 12px 24px;
+        font-weight: 600;
+        width: 100%;
+        transition: transform 0.1s ease;
+    }
     div.stButton > button:active { transform: scale(0.98); }
+    
+    /* Delete Button Styling */
+    button[kind="secondary"] {
+        background: transparent !important;
+        border: 1px solid #ff4b4b !important;
+        color: #ff4b4b !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -41,6 +81,7 @@ with st.sidebar:
     st.markdown("### 👥 Squad Roster")
     st.caption("Add or remove people below.")
     
+    # Editable Roster
     edited_members = st.data_editor(
         st.session_state.members_df,
         num_rows="dynamic",
@@ -55,14 +96,31 @@ with st.sidebar:
     st.session_state.members_df = edited_members
     current_group_list = [name for name in st.session_state.members_df["Name"].dropna().unique().tolist() if name.strip() != ""]
 
-    if current_group_list:
-        st.markdown("#### Active Members")
-        chips_html = '<div style="display: flex; flex-wrap: wrap; gap: 10px;">'
-        for name in current_group_list:
-            avatar_url = f"https://api.dicebear.com/9.x/notionists/svg?seed={name}&backgroundColor=b6e3f4,c0aede,d1d4f9"
-            chips_html += f'<div style="display: flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); padding: 4px 12px 4px 4px; border-radius: 30px;"><img src="{avatar_url}" width="28" height="28" style="border-radius: 50%;"><span style="color: #e0e0e0; font-size: 13px; font-weight: 500;">{name}</span></div>'
-        chips_html += "</div>"
-        st.markdown(chips_html, unsafe_allow_html=True)
+    # HISTORY SECTION (Replaced Active Members)
+    st.divider()
+    st.markdown("### 📜 History")
+    
+    if not st.session_state.history:
+        st.caption("No saved settlements yet.")
+    else:
+        # Loop backwards to show newest first
+        for i, record in enumerate(reversed(st.session_state.history)):
+            # We need the original index to delete the correct item
+            original_index = len(st.session_state.history) - 1 - i
+            
+            with st.container():
+                st.markdown(f"""
+                <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid #7D56F4;">
+                    <div style="font-size: 12px; color: #aaa;">{record['timestamp']}</div>
+                    <div style="font-weight: bold; font-size: 14px; color: white;">Total: ₹{record['total']:,.0f}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                c_del, c_view = st.columns([1, 2])
+                with c_del:
+                    if st.button("🗑️", key=f"del_{original_index}", type="secondary"):
+                        st.session_state.history.pop(original_index)
+                        st.rerun()
 
 # --- MAIN APP ---
 st.markdown("# ⚡ Dashboard")
@@ -77,7 +135,15 @@ if 'data' not in st.session_state:
         {"item": "WiFi Bill", "price": 999.0, "buyer": p2},
     ])
 
+# 1. DATE INPUT (Added above Ledger)
+col_date, col_space = st.columns([1, 3])
+with col_date:
+    selected_date = st.date_input("📅 Expense Date", value=datetime.now())
+
+# 2. LEDGER
 st.write("### 📝 Active Ledger")
+st.caption("Hover over a row to see the **Trash Icon** (Delete) on the right.")
+
 edited_display = st.data_editor(
     st.session_state.data, 
     num_rows="dynamic", 
@@ -105,7 +171,7 @@ with col_btn:
 # --- LOGIC & RESULTS ---
 if st.session_state.show_results:
     
-    # 1. Net Balances
+    # Calculation Logic
     def calculate_net_balances(df, members):
         spent = defaultdict(float)
         valid_rows = df[df["buyer"].isin(members)]
@@ -123,7 +189,6 @@ if st.session_state.show_results:
             final_balances[person] = spent[person] - avg
         return final_balances, total, spent
 
-    # 2. Who Pays Whom (Greedy)
     def solve_payments(balances):
         debtors = []
         creditors = []
@@ -148,7 +213,7 @@ if st.session_state.show_results:
     balances, total_volume, spent_dict = calculate_net_balances(st.session_state.data, current_group_list)
     transfer_instructions = solve_payments(balances)
     
-    # --- VISUALIZATION ---
+    # Visuals
     c_viz, c_receipt = st.columns([1, 1])
     
     with c_viz:
@@ -162,6 +227,20 @@ if st.session_state.show_results:
                               font=dict(color='white'))
             st.plotly_chart(fig, use_container_width=True)
             st.metric("Total Volume", f"₹{total_volume:,.0f}")
+            
+            # SAVE TO HISTORY BUTTON
+            if st.button("💾 Save to History", use_container_width=True):
+                # Construct history object
+                record = {
+                    "timestamp": selected_date.strftime("%d %b %Y"), # Use the custom date
+                    "total": total_volume,
+                    "details": transfer_instructions
+                }
+                st.session_state.history.append(record)
+                st.toast("Saved to sidebar history!", icon="📜")
+                time.sleep(1)
+                st.rerun()
+
         else:
             st.info("No expenses added yet.")
 
@@ -190,7 +269,7 @@ if st.session_state.show_results:
 
             st.divider()
             st.write("#### 📱 WhatsApp")
-            receipt_text = f"🧾 *Splitly Plan*\n"
+            receipt_text = f"🧾 *Splitly Plan* ({selected_date.strftime('%d %b')})\n"
             for t in transfer_instructions:
                 clean_t = t.replace("**", "")
                 receipt_text += f"➡️ {clean_t}\n"
