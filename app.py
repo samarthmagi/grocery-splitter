@@ -1,4 +1,4 @@
-import streamlit as stimport streamlit as st
+import streamlit as st
 import pandas as pd
 import plotly.express as px
 from collections import defaultdict
@@ -8,7 +8,7 @@ import time
 # 1. Page Config
 st.set_page_config(page_title="Splitly", page_icon="⚡", layout="wide")
 
-# 2. Custom CSS (Dark Mode & Smooth UI)
+# 2. Custom CSS
 st.markdown("""
     <style>
     /* Main Background */
@@ -67,9 +67,7 @@ if 'members_df' not in st.session_state:
         {"Name": "Guest", "Role": "Guest"}
     ])
 
-# --- MAIN APP ---
-
-# Sidebar
+# --- SIDEBAR ---
 with st.sidebar:
     st.markdown("### ⚡ Splitly")
     st.divider()
@@ -101,12 +99,12 @@ with st.sidebar:
         chips_html += "</div>"
         st.markdown(chips_html, unsafe_allow_html=True)
 
-# Header
+# --- MAIN APP ---
 st.markdown("# ⚡ Dashboard")
 st.markdown("Real-time settlement engine active.")
 st.divider()
 
-# --- DATA LOGIC ---
+# Data Initialization
 if 'data' not in st.session_state:
     p1 = current_group_list[0] if len(current_group_list) > 0 else "User"
     p2 = current_group_list[1] if len(current_group_list) > 1 else "User"
@@ -117,13 +115,13 @@ if 'data' not in st.session_state:
 
 # Ledger UI
 st.write("### 📝 Active Ledger")
-st.caption("Hover over the table to see the Delete (Trash Can) icon on the right.")
+st.caption("Hover over a row to see the **Trash Icon** (Delete) on the right.")
 
 edited_display = st.data_editor(
     st.session_state.data, 
     num_rows="dynamic", 
     use_container_width=True,
-    hide_index=True, 
+    hide_index=True, # No more checkboxes/numbers!
     column_config={
         "price": st.column_config.NumberColumn("Amount (₹)", format="₹%d"),
         "buyer": st.column_config.SelectboxColumn("Paid By", options=current_group_list, required=True),
@@ -139,13 +137,13 @@ if not edited_display.equals(st.session_state.data):
 
 st.divider()
 
-# --- THE TRIGGER BUTTON ---
+# Trigger Button
 col_btn, col_blank = st.columns([1, 4])
 with col_btn:
     if st.button("🚀 Calculate Split", type="primary", use_container_width=True):
         st.session_state.show_results = True
 
-# --- RESULTS SECTION ---
+# Results Section
 if st.session_state.show_results:
     
     # Logic
@@ -217,4 +215,4 @@ else:
 
 # Footer
 st.markdown("<br><br>", unsafe_allow_html=True)
-st.caption("© 2026 Splitly Inc. • YC Summer 2026")
+st.caption("© 2026 Splitly Inc.")
