@@ -105,25 +105,14 @@ with st.sidebar:
     st.session_state.members_df = edited_members
     current_group_list = [name for name in st.session_state.members_df["Name"].dropna().unique().tolist() if name.strip() != ""]
 
-    # NEW: AVATARS (DiceBear API)
+    # FIXED AVATARS (Minified HTML to prevent code-block error)
     if current_group_list:
         st.markdown("#### Active Members")
         chips_html = '<div style="display: flex; flex-wrap: wrap; gap: 10px;">'
         for name in current_group_list:
-            # Generate a unique avatar for each name
             avatar_url = f"https://api.dicebear.com/9.x/notionists/svg?seed={name}&backgroundColor=b6e3f4,c0aede,d1d4f9"
-            chips_html += f'''
-            <div style="
-                display: flex; align-items: center; gap: 8px;
-                background: rgba(255, 255, 255, 0.05);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                padding: 4px 12px 4px 4px;
-                border-radius: 30px;
-            ">
-                <img src="{avatar_url}" width="28" height="28" style="border-radius: 50%;">
-                <span style="color: #e0e0e0; font-size: 13px; font-weight: 500;">{name}</span>
-            </div>
-            '''
+            # We compress this line so Streamlit renders it as HTML, not Code
+            chips_html += f'<div style="display: flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); padding: 4px 12px 4px 4px; border-radius: 30px;"><img src="{avatar_url}" width="28" height="28" style="border-radius: 50%;"><span style="color: #e0e0e0; font-size: 13px; font-weight: 500;">{name}</span></div>'
         chips_html += "</div>"
         st.markdown(chips_html, unsafe_allow_html=True)
 
@@ -186,7 +175,7 @@ with c_main:
 with c_viz:
     st.write("### 📊 Analytics")
     
-    # NEW: INTERACTIVE DONUT CHART
+    # INTERACTIVE DONUT CHART
     if total_volume > 0:
         chart_data = pd.DataFrame(list(spent_dict.items()), columns=["Person", "Amount"])
         fig = px.pie(chart_data, values='Amount', names='Person', hole=0.6, 
@@ -216,7 +205,6 @@ if balances:
     if not active_balances:
         st.info("Everything is settled up! ✅")
     else:
-        # Cards
         cols = st.columns(4)
         for i, (person, bal) in enumerate(active_balances.items()):
             with cols[i % 4]:
@@ -231,7 +219,7 @@ if balances:
                 </div>
                 """, unsafe_allow_html=True)
 
-    # NEW: WHATSAPP RECEIPT GENERATOR
+    # WHATSAPP RECEIPT
     st.divider()
     st.write("### 📱 Share Receipt")
     
