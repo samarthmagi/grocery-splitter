@@ -90,7 +90,7 @@ with st.sidebar:
     st.markdown("### 👥 Squad Roster")
     st.caption("Edit names below. They will appear as badges.")
     
-    # 1. EDITABLE ROSTER (Hidden Index for cleanliness)
+    # 1. EDITABLE ROSTER
     edited_members = st.data_editor(
         st.session_state.members_df,
         num_rows="dynamic",
@@ -107,24 +107,12 @@ with st.sidebar:
     # Extract list
     current_group_list = [name for name in st.session_state.members_df["Name"].dropna().unique().tolist() if name.strip() != ""]
 
-    # 2. PARALLEL VIEW (THE UPDATE)
+    # 2. PARALLEL VIEW (FIXED: Single line HTML to prevent code-block rendering)
     if current_group_list:
         st.markdown("#### Active Members")
-        # Creating HTML Chips for Parallel Display
         chips_html = '<div style="display: flex; flex-wrap: wrap; gap: 8px;">'
         for name in current_group_list:
-            chips_html += f'''
-            <div style="
-                background: rgba(125, 86, 244, 0.15);
-                border: 1px solid rgba(125, 86, 244, 0.5);
-                padding: 6px 14px;
-                border-radius: 20px;
-                color: #e0e0e0;
-                font-size: 12px;
-                font-weight: 500;
-                letter-spacing: 0.5px;
-            ">{name}</div>
-            '''
+            chips_html += f'<div style="background: rgba(125, 86, 244, 0.15); border: 1px solid rgba(125, 86, 244, 0.5); padding: 6px 14px; border-radius: 20px; color: #e0e0e0; font-size: 12px; font-weight: 500; letter-spacing: 0.5px;">{name}</div>'
         chips_html += "</div>"
         st.markdown(chips_html, unsafe_allow_html=True)
 
