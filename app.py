@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit as stimport streamlit as st
 import pandas as pd
 import plotly.express as px
 from collections import defaultdict
@@ -8,7 +8,7 @@ import time
 # 1. Page Config
 st.set_page_config(page_title="Splitly", page_icon="⚡", layout="wide")
 
-# 2. Custom CSS (Fixed Sidebar Glitch & Smoother UI)
+# 2. Custom CSS (Dark Mode & Smooth UI)
 st.markdown("""
     <style>
     /* Main Background */
@@ -17,11 +17,11 @@ st.markdown("""
         background-image: radial-gradient(circle at 50% 0%, #1a0b2e 0%, #050505 60%);
     }
     
-    /* Text Styling */
+    /* Typography */
     h1, h2, h3 { font-family: 'Inter', sans-serif; color: #ffffff !important; letter-spacing: -0.5px; }
     p, label, .stMarkdown, .stCaption { color: #a0a0a0 !important; }
     
-    /* Smooth Inputs */
+    /* Inputs */
     .stTextInput input, .stNumberInput input {
         background-color: #111111 !important;
         color: white !important;
@@ -29,7 +29,7 @@ st.markdown("""
         border-radius: 8px !important;
     }
     
-    /* Metrics */
+    /* Cards */
     div[data-testid="stMetric"] {
         background: rgba(255, 255, 255, 0.03);
         backdrop-filter: blur(10px);
@@ -39,7 +39,7 @@ st.markdown("""
         box-shadow: 0 4px 20px rgba(125, 86, 244, 0.1);
     }
     
-    /* Calculate Button (Primary) */
+    /* Calculate Button */
     div.stButton > button {
         background: linear-gradient(90deg, #7D56F4 0%, #4B0082 100%);
         color: white;
@@ -55,8 +55,6 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # 3. Session State
-if 'logged_in' not in st.session_state: st.session_state.logged_in = False
-if 'user' not in st.session_state: st.session_state.user = None
 if 'history' not in st.session_state: st.session_state.history = []
 if 'show_results' not in st.session_state: st.session_state.show_results = False
 
@@ -69,36 +67,14 @@ if 'members_df' not in st.session_state:
         {"Name": "Guest", "Role": "Guest"}
     ])
 
-# --- AUTHENTICATION ---
-if not st.session_state.logged_in:
-    c1, c2, c3 = st.columns([1, 2, 1])
-    with c2:
-        st.markdown("<br><br><br>", unsafe_allow_html=True)
-        st.markdown("# ⚡ Splitly")
-        st.markdown("### The Frictionless Way to Settle Debt.")
-        
-        tab1, tab2 = st.tabs(["Log In", "Sign Up"])
-        with tab1:
-            email = st.text_input("Email Address", placeholder="name@example.com")
-            password = st.text_input("Password", type="password", placeholder="••••••••")
-            if st.button("Log In →"):
-                st.session_state.logged_in = True
-                st.session_state.user = email.split('@')[0].capitalize() if email else "User"
-                st.rerun()
-            if st.button("Continue with Google"):
-                with st.spinner("Connecting..."):
-                    time.sleep(1.0)
-                    st.session_state.logged_in = True
-                    st.session_state.user = "Samarth"
-                    st.rerun()
-    st.stop()
-
 # --- MAIN APP ---
+
+# Sidebar
 with st.sidebar:
-    st.markdown(f"### 👋 Hi, {st.session_state.user}")
+    st.markdown("### ⚡ Splitly")
     st.divider()
     st.markdown("### 👥 Squad Roster")
-    st.caption("Edit names below.")
+    st.caption("Add or remove people below.")
     
     # Editable Roster
     edited_members = st.data_editor(
@@ -115,7 +91,7 @@ with st.sidebar:
     st.session_state.members_df = edited_members
     current_group_list = [name for name in st.session_state.members_df["Name"].dropna().unique().tolist() if name.strip() != ""]
 
-    # Fixed Sidebar Avatars (Minified HTML)
+    # Avatars
     if current_group_list:
         st.markdown("#### Active Members")
         chips_html = '<div style="display: flex; flex-wrap: wrap; gap: 10px;">'
@@ -124,11 +100,6 @@ with st.sidebar:
             chips_html += f'<div style="display: flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); padding: 4px 12px 4px 4px; border-radius: 30px;"><img src="{avatar_url}" width="28" height="28" style="border-radius: 50%;"><span style="color: #e0e0e0; font-size: 13px; font-weight: 500;">{name}</span></div>'
         chips_html += "</div>"
         st.markdown(chips_html, unsafe_allow_html=True)
-
-    st.divider()
-    if st.button("Log Out"):
-        st.session_state.logged_in = False
-        st.rerun()
 
 # Header
 st.markdown("# ⚡ Dashboard")
@@ -144,31 +115,25 @@ if 'data' not in st.session_state:
         {"item": "WiFi Bill", "price": 999.0, "buyer": p2},
     ])
 
-# Auto-Increment S.No Logic
-# We force the S.No column to match the row index + 1 every time
-df_display = st.session_state.data.copy()
-df_display.insert(0, "S.No", range(1, len(df_display) + 1))
-
 # Ledger UI
 st.write("### 📝 Active Ledger")
+st.caption("Hover over the table to see the Delete (Trash Can) icon on the right.")
+
 edited_display = st.data_editor(
-    df_display, 
+    st.session_state.data, 
     num_rows="dynamic", 
     use_container_width=True,
-    hide_index=True, # This removes the checkbox column you hated!
+    hide_index=True, 
     column_config={
-        "S.No": st.column_config.NumberColumn("S.No", disabled=True, width="small"),
         "price": st.column_config.NumberColumn("Amount (₹)", format="₹%d"),
         "buyer": st.column_config.SelectboxColumn("Paid By", options=current_group_list, required=True),
         "item": st.column_config.TextColumn("Item Name", width="large")
     }
 )
 
-# Sync changes back to session state (Ignoring S.No)
-if not edited_display.equals(df_display):
-    # Drop S.No before saving back to state
-    st.session_state.data = edited_display.drop(columns=["S.No"])
-    # If user changes data, hide results until they click calculate again
+# Sync changes
+if not edited_display.equals(st.session_state.data):
+    st.session_state.data = edited_display
     st.session_state.show_results = False
     st.rerun()
 
@@ -180,7 +145,7 @@ with col_btn:
     if st.button("🚀 Calculate Split", type="primary", use_container_width=True):
         st.session_state.show_results = True
 
-# --- RESULTS SECTION (Only shows after button click) ---
+# --- RESULTS SECTION ---
 if st.session_state.show_results:
     
     # Logic
